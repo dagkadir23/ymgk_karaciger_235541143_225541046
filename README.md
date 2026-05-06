@@ -23,12 +23,13 @@ Proje, Unity oyun motoru üzerinde çalışacak şekilde tasarlanmış olup, SRP
 Sistem için gerekli olan temel etkileşim, veri yönetimi ve UI algoritmaları modüler C# scriptleri olarak yazılmıştır. Proje, THS (Teknoloji Hazırlık Seviyesi) 4 hedefine uygun olarak laboratuvar/geliştirme ortamında bileşen bazında doğrulanmaya hazırdır.
 
 ## ⚙️ Kurulum ve Çalıştırma
-> **Yakında:** Unity import aşaması ve sahne kurulumu tamamlandığında detaylı kurulum adımları buraya eklenecektir.
 
-1. Bu depoyu klonlayın: `git clone https://github.com/dagkadir23/ymgk_karaciger_235541143_225541046.git`
-2. Unity Hub üzerinden yeni bir 3D/URP projesi oluşturun.
-3. `Assets/Scripts/` klasörünü Unity projenizin içine sürükleyin.
-4. *Sahne kurulumu için `docs/UserScenario.pdf` ve gelecekteki dokümanları takip edin.*
+Projenin kurulumu, bilgisayar ortamı (Editör) ve Mobil Cihazlar (Android) için otomatikleştirilmiştir:
+
+1. Bu depoyu Unity Hub üzerinden bir proje olarak açın.
+2. Üst menüde yer alan **PatientLive -> Sahneyi Otomatik Kur (Mobil-Dikey)** seçeneğine tıklayın.
+3. Tüm UI ve 3D Karaciğer modeli hiyerarşisi otomatik olarak sahnenize dizilecektir.
+4. **Mobil Cihazlara Kurulum (APK Build):** Uygulamayı Android telefonunuzda test etmek ve adım adım build almak için [docs/Mobile_Build_Rehberi.md](docs/Mobile_Build_Rehberi.md) belgesini inceleyin.
 
 ## 🎬 Demo ve Videolar
 > **Durum:** Prototip geliştirme aşamasında. 
