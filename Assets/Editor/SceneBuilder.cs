@@ -1,4 +1,4 @@
-#if UNITY_EDITOR
+#if false && UNITY_EDITOR
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;

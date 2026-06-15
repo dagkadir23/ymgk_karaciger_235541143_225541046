@@ -1,6 +1,5 @@
 using PatientLive.Data;
 using PatientLive.Utilities;
-using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -13,9 +12,9 @@ namespace PatientLive.UI
     public class DiseaseInfoPanel : MonoBehaviour
     {
         [Header("UI References")]
-        [SerializeField] private TMP_Text titleText;
-        [SerializeField] private TMP_Text typeText;
-        [SerializeField] private TMP_Text descriptionText;
+        [SerializeField] private Text titleText;
+        [SerializeField] private Text typeText;
+        [SerializeField] private Text descriptionText;
         [SerializeField] private Image typeColorIndicator;
 
         [Header("Animation")]

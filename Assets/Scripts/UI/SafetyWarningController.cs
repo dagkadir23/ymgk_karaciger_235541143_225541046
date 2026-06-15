@@ -1,5 +1,4 @@
 using PatientLive.Utilities;
-using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -12,8 +11,8 @@ namespace PatientLive.UI
     public class SafetyWarningController : MonoBehaviour
     {
         [Header("UI References")]
-        [SerializeField] private TMP_Text titleText;
-        [SerializeField] private TMP_Text warningText;
+        [SerializeField] private Text titleText;
+        [SerializeField] private Text warningText;
         [SerializeField] private Button acceptButton;
 
         [Header("Content")]

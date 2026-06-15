@@ -1,0 +1,20 @@
+{
+  "asset": "procedural healthy adult liver approximation",
+  "formats": [
+    "glb",
+    "obj",
+    "stl"
+  ],
+  "unity_target": "MR/educational prototype",
+  "not_medical_grade": true,
+  "parts": [
+    "liver mesh",
+    "gallbladder",
+    "portal vein",
+    "hepatic artery",
+    "bile duct",
+    "IVC groove marker",
+    "ligamentum teres marker",
+    "porta fibrous tissue"
+  ]
+}
