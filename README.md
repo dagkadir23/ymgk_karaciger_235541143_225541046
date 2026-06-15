@@ -41,3 +41,10 @@ Projenin kurulumu, bilgisayar ortamı (Editör) ve Mobil Cihazlar (Android) içi
 ## 🎬 Demo ve Videolar
 > **Durum:** Prototip geliştirme aşamasında. 
 Şu anda kod walkthrough (kod okuma/anlatım) demosu mevcuttur. Demo videosu projenin kök dizininde `Demo_video.mp4` dosyası olarak bulunmaktadır. Projenin Trello bağlantısına ise `Trello_link.txt` içerisinden ulaşabilirsiniz.
+
+## 👥 Ekip Görev ve Sorumlulukları
+
+Projenin geliştirilme sürecinde takım üyelerinin sorumlulukları ve ölçülebilir görevleri aşağıdaki gibi belirlenmiştir:
+
+*   **Yusuf Enes Karahan (235541143):** Takım lideri. Proje iskeletinin ve mimarisinin oluşturulması (Core modüller), AR altyapısının kurgulanması ve projeye uygun 3D/Asset araştırılıp entegre edilmesi süreçlerinden sorumludur.
+*   **Abdulkadir Dağ (225541046):** Kullanıcı arayüzü (UI) geliştirme. UI panellerinin tasarlanması, hastalık bilgi ekranlarının (DiseaseInfoPanel) kodlanması, projedeki gerekli özel asset'lerin oluşturulması ve düzenlenmesi süreçlerinden sorumludur.
