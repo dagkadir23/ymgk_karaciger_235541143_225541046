@@ -1,41 +1,42 @@
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace PatientLive.UI
 {
     /// <summary>
-    /// Self-contained demo overlay that makes the MVP scene feel populated during presentations.
-    /// It intentionally uses mock values and does not depend on backend or medical data.
+    /// Polished presentation UI with working fake controls for the project demo.
     /// </summary>
     public class DemoDashboardUI : MonoBehaviour
     {
         private const float ReferenceWidth = 1080f;
         private const float ReferenceHeight = 1920f;
 
-        [SerializeField] private bool showOnStart = true;
-
-        private readonly Color navy = new Color(0.035f, 0.055f, 0.085f, 0.96f);
-        private readonly Color panel = new Color(0.07f, 0.095f, 0.13f, 0.92f);
-        private readonly Color panelSoft = new Color(0.105f, 0.14f, 0.18f, 0.92f);
-        private readonly Color accent = new Color(0.18f, 0.72f, 0.88f, 1f);
-        private readonly Color success = new Color(0.28f, 0.82f, 0.54f, 1f);
-        private readonly Color warning = new Color(1f, 0.68f, 0.22f, 1f);
-        private readonly Color danger = new Color(1f, 0.28f, 0.34f, 1f);
+        private readonly Color page = new Color(0.02f, 0.028f, 0.04f, 0.68f);
+        private readonly Color panel = new Color(0.055f, 0.072f, 0.096f, 0.94f);
+        private readonly Color panelAlt = new Color(0.078f, 0.105f, 0.135f, 0.92f);
+        private readonly Color line = new Color(1f, 1f, 1f, 0.12f);
+        private readonly Color cyan = new Color(0.15f, 0.78f, 0.94f, 1f);
+        private readonly Color green = new Color(0.24f, 0.82f, 0.52f, 1f);
+        private readonly Color amber = new Color(1f, 0.68f, 0.22f, 1f);
+        private readonly Color red = new Color(1f, 0.24f, 0.31f, 1f);
+        private readonly Color textSoft = new Color(0.72f, 0.82f, 0.88f, 1f);
 
         private Font font;
         private Text statusText;
-        private Text progressText;
-        private Image scanProgressFill;
+        private Text insightTitle;
+        private Text insightBody;
+        private Text scanPercentText;
+        private Text confidenceText;
+        private Image scanFill;
         private Image confidenceFill;
-        private CanvasGroup rootGroup;
-
         private float elapsed;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Bootstrap()
         {
-            if (FindObjectOfType<DemoDashboardUI>() != null)
+            if (FindFirstObjectByType<DemoDashboardUI>() != null)
             {
                 return;
             }
@@ -53,28 +54,23 @@ namespace PatientLive.UI
                 font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             }
 
-            if (EventSystem.current == null)
-            {
-                var eventSystem = new GameObject("EventSystem");
-                eventSystem.AddComponent<EventSystem>();
-                eventSystem.AddComponent<StandaloneInputModule>();
-            }
-
+            EnsureEventSystem();
+            EnsureShowcase();
             BuildUi();
-            rootGroup.alpha = showOnStart ? 1f : 0f;
-            rootGroup.interactable = showOnStart;
-            rootGroup.blocksRaycasts = showOnStart;
         }
 
         private void Update()
         {
             elapsed += Time.deltaTime;
 
-            float scanProgress = Mathf.PingPong(elapsed * 0.12f, 1f);
-            scanProgressFill.fillAmount = Mathf.Lerp(0.18f, 0.92f, scanProgress);
-            confidenceFill.fillAmount = Mathf.Lerp(0.72f, 0.97f, Mathf.PingPong(elapsed * 0.18f, 1f));
-            progressText.text = $"{Mathf.RoundToInt(scanProgressFill.fillAmount * 100f)}%";
-            statusText.text = scanProgress > 0.82f ? "Analiz tamamlanıyor" : "Model taranıyor";
+            float scan = Mathf.PingPong(elapsed * 0.1f, 1f);
+            float confidence = Mathf.Lerp(0.78f, 0.96f, Mathf.PingPong(elapsed * 0.16f, 1f));
+
+            scanFill.fillAmount = Mathf.Lerp(0.28f, 0.94f, scan);
+            confidenceFill.fillAmount = confidence;
+            scanPercentText.text = Mathf.RoundToInt(scanFill.fillAmount * 100f) + "%";
+            confidenceText.text = Mathf.RoundToInt(confidence * 100f) + "%";
+            statusText.text = scan > 0.86f ? "Rapor hazırlanıyor" : "Canlı analiz";
         }
 
         private void BuildUi()
@@ -84,7 +80,7 @@ namespace PatientLive.UI
 
             var canvas = canvasObject.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = 50;
+            canvas.sortingOrder = 80;
 
             var scaler = canvasObject.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
@@ -93,104 +89,136 @@ namespace PatientLive.UI
             scaler.matchWidthOrHeight = 0.5f;
 
             canvasObject.AddComponent<GraphicRaycaster>();
-            rootGroup = canvasObject.AddComponent<CanvasGroup>();
 
-            CreateFullScreenBackground(canvasObject.transform);
-            CreateHeader(canvasObject.transform);
-            CreateLeftPanel(canvasObject.transform);
-            CreateRightPanel(canvasObject.transform);
-            CreateBottomPanel(canvasObject.transform);
+            var tint = Panel(canvasObject.transform, "ScreenTint", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, page);
+            tint.rectTransform.offsetMin = Vector2.zero;
+            tint.rectTransform.offsetMax = Vector2.zero;
+            tint.raycastTarget = false;
+
+            Header(canvasObject.transform);
+            LeftControls(canvasObject.transform);
+            RightVitals(canvasObject.transform);
+            BottomInsight(canvasObject.transform);
+            CenterHints(canvasObject.transform);
         }
 
-        private void CreateFullScreenBackground(Transform parent)
+        private void Header(Transform parent)
         {
-            var background = CreatePanel(parent, "DemoTint", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, navy);
-            background.raycastTarget = false;
+            var header = Panel(parent, "Header", new Vector2(0f, 1f), Vector2.one, new Vector2(0f, 1f), Vector2.zero, panel);
+            header.rectTransform.offsetMin = new Vector2(0f, -132f);
+            header.rectTransform.offsetMax = Vector2.zero;
+
+            AddText(header.transform, "PatientLive", 42, FontStyle.Bold, Color.white, new Vector2(36f, -22f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(330f, 54f), TextAnchor.UpperLeft);
+            AddText(header.transform, "Karaciğer sağlığı görselleştirme paneli", 24, FontStyle.Normal, textSoft, new Vector2(36f, -78f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(520f, 36f), TextAnchor.UpperLeft);
+            AddChip(header.transform, "DEMO", cyan, new Vector2(-420f, -42f), 104f);
+            AddChip(header.transform, "MR-SEG AI", green, new Vector2(-294f, -42f), 144f);
+            statusText = AddText(header.transform, "Canlı analiz", 25, FontStyle.Bold, Color.white, new Vector2(-132f, -37f), Vector2.one, Vector2.one, new Vector2(112f, 34f), TextAnchor.MiddleRight);
         }
 
-        private void CreateHeader(Transform parent)
+        private void LeftControls(Transform parent)
         {
-            var header = CreatePanel(parent, "Header", new Vector2(0f, 1f), Vector2.one, new Vector2(0f, 1f), new Vector2(0f, -132f), panel);
-            AddText(header.transform, "PatientLive", 42, FontStyle.Bold, Color.white, new Vector2(40f, -22f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(420f, 52f), TextAnchor.UpperLeft);
-            AddText(header.transform, "Karaciğer MR Görselleştirme - Demo Oturumu", 24, FontStyle.Normal, new Color(0.74f, 0.84f, 0.9f), new Vector2(40f, -78f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(620f, 38f), TextAnchor.UpperLeft);
+            var left = Panel(parent, "ControlsPanel", new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(28f, 12f), panel);
+            SetSize(left.rectTransform, 305f, 1120f);
 
-            CreateChip(header.transform, "ONLINE", success, new Vector2(-310f, -40f));
-            statusText = AddText(header.transform, "Model taranıyor", 26, FontStyle.Bold, Color.white, new Vector2(-190f, -36f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(160f, 40f), TextAnchor.MiddleLeft);
+            AddText(left.transform, "Kontrol Merkezi", 29, FontStyle.Bold, Color.white, new Vector2(24f, 520f), Vector2.zero, Vector2.zero, new Vector2(250f, 42f), TextAnchor.MiddleLeft);
+            AddText(left.transform, "Sunum için çalışan sahte modlar", 18, FontStyle.Normal, textSoft, new Vector2(24f, 486f), Vector2.zero, Vector2.zero, new Vector2(250f, 28f), TextAnchor.MiddleLeft);
+
+            AddActionButton(left.transform, "Risk Haritası", "Kırmızı taralı alanı aç", red, new Vector2(24f, 398f), () => SetInsight("Risk Haritası", DemoLiverShowcase.Instance.ShowRiskMode()));
+            AddActionButton(left.transform, "Sağlıklı Doku", "Normal alanları yeşil göster", green, new Vector2(24f, 290f), () => SetInsight("Sağlıklı Doku", DemoLiverShowcase.Instance.ShowHealthyMode()));
+            AddActionButton(left.transform, "Taralı Bölgeler", "Hastalık katmanını aç/kapat", amber, new Vector2(24f, 182f), () => SetInsight("Taralı Bölgeler", DemoLiverShowcase.Instance.ToggleLesionLayer()));
+            AddActionButton(left.transform, "Damar Katmanı", "Mavi damar görünümü", cyan, new Vector2(24f, 74f), () => SetInsight("Damar Katmanı", DemoLiverShowcase.Instance.ToggleVesselLayer()));
+            AddActionButton(left.transform, "Ön Rapor", "Şüpheli alanları büyüt", green, new Vector2(24f, -34f), () => SetInsight("Ön Rapor", DemoLiverShowcase.Instance.ToggleReportMode()));
+
+            AddText(left.transform, "Model Görünümü", 24, FontStyle.Bold, Color.white, new Vector2(24f, -178f), Vector2.zero, Vector2.zero, new Vector2(250f, 36f), TextAnchor.MiddleLeft);
+            AddSquareButton(left.transform, "+", cyan, new Vector2(24f, -250f), () => { DemoLiverShowcase.Instance.ZoomIn(); SetInsight("Yakınlaştırma", "3B karaciğer modeli yaklaştırıldı; taralı bölgeler daha net incelenebilir."); });
+            AddSquareButton(left.transform, "-", cyan, new Vector2(112f, -250f), () => { DemoLiverShowcase.Instance.ZoomOut(); SetInsight("Uzaklaştırma", "Model uzaklaştırıldı; tüm karaciğer anatomisi tek ekranda görüntüleniyor."); });
+            AddSquareButton(left.transform, "0", amber, new Vector2(200f, -250f), () => { DemoLiverShowcase.Instance.ResetView(); SetInsight("Görünüm Sıfırlandı", "Model varsayılan açı ve ölçeğe döndürüldü."); });
         }
 
-        private void CreateLeftPanel(Transform parent)
+        private void RightVitals(Transform parent)
         {
-            var left = CreatePanel(parent, "ToolPanel", new Vector2(0f, 0.34f), new Vector2(0f, 0.94f), new Vector2(0f, 1f), new Vector2(28f, -170f), panel);
-            SetSize(left.rectTransform, 310f, 1050f);
+            var right = Panel(parent, "VitalsPanel", new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-28f, 90f), panel);
+            SetSize(right.rectTransform, 325f, 880f);
 
-            AddText(left.transform, "Kontroller", 30, FontStyle.Bold, Color.white, new Vector2(28f, -26f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(240f, 46f), TextAnchor.MiddleLeft);
-            AddButton(left.transform, "3B Model", accent, new Vector2(26f, -112f));
-            AddButton(left.transform, "Lezyonlar", danger, new Vector2(26f, -214f));
-            AddButton(left.transform, "Damar Yapısı", warning, new Vector2(26f, -316f));
-            AddButton(left.transform, "Rapor Önizleme", success, new Vector2(26f, -418f));
+            AddText(right.transform, "Analiz Özeti", 29, FontStyle.Bold, Color.white, new Vector2(24f, 392f), Vector2.zero, Vector2.zero, new Vector2(260f, 42f), TextAnchor.MiddleLeft);
+            AddMetric(right.transform, "Karaciğer hacmi", "1.42 L", cyan, new Vector2(24f, 306f));
+            AddMetric(right.transform, "Şüpheli alan", "2 bölge", red, new Vector2(24f, 202f));
+            AddMetric(right.transform, "Kist olasılığı", "Düşük", amber, new Vector2(24f, 98f));
+            AddMetric(right.transform, "Genel durum", "İzlem", green, new Vector2(24f, -6f));
 
-            AddText(left.transform, "Katmanlar", 26, FontStyle.Bold, Color.white, new Vector2(28f, -560f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(240f, 40f), TextAnchor.MiddleLeft);
-            AddToggleRow(left.transform, "Sağlıklı Doku", success, new Vector2(28f, -628f));
-            AddToggleRow(left.transform, "Tümör Adayı", danger, new Vector2(28f, -704f));
-            AddToggleRow(left.transform, "Kist Bölgesi", accent, new Vector2(28f, -780f));
+            AddText(right.transform, "Tarama ilerlemesi", 22, FontStyle.Bold, Color.white, new Vector2(24f, -142f), Vector2.zero, Vector2.zero, new Vector2(210f, 32f), TextAnchor.MiddleLeft);
+            scanFill = AddProgress(right.transform, new Vector2(24f, -192f), cyan);
+            scanPercentText = AddText(right.transform, "0%", 21, FontStyle.Bold, Color.white, new Vector2(244f, -180f), Vector2.zero, Vector2.zero, new Vector2(50f, 30f), TextAnchor.MiddleRight);
+
+            AddText(right.transform, "Model güveni", 22, FontStyle.Bold, Color.white, new Vector2(24f, -260f), Vector2.zero, Vector2.zero, new Vector2(210f, 32f), TextAnchor.MiddleLeft);
+            confidenceFill = AddProgress(right.transform, new Vector2(24f, -310f), green);
+            confidenceText = AddText(right.transform, "0%", 21, FontStyle.Bold, Color.white, new Vector2(244f, -298f), Vector2.zero, Vector2.zero, new Vector2(50f, 30f), TextAnchor.MiddleRight);
         }
 
-        private void CreateRightPanel(Transform parent)
+        private void BottomInsight(Transform parent)
         {
-            var right = CreatePanel(parent, "MetricsPanel", Vector2.one, Vector2.one, Vector2.one, new Vector2(-28f, -170f), panel);
-            SetSize(right.rectTransform, 330f, 620f);
-
-            AddText(right.transform, "Canlı Analiz", 30, FontStyle.Bold, Color.white, new Vector2(26f, -26f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(260f, 44f), TextAnchor.MiddleLeft);
-            AddMetric(right.transform, "Segmentasyon", "Aktif", success, new Vector2(26f, -105f));
-            AddMetric(right.transform, "Bulgu Sayısı", "3", warning, new Vector2(26f, -204f));
-            AddMetric(right.transform, "Risk Skoru", "Orta", danger, new Vector2(26f, -303f));
-
-            AddText(right.transform, "Tarama", 24, FontStyle.Bold, Color.white, new Vector2(26f, -420f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(140f, 34f), TextAnchor.MiddleLeft);
-            scanProgressFill = CreateProgress(right.transform, new Vector2(26f, -472f), accent);
-            progressText = AddText(right.transform, "0%", 22, FontStyle.Bold, Color.white, new Vector2(242f, -456f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(60f, 34f), TextAnchor.MiddleRight);
-
-            AddText(right.transform, "Güven", 24, FontStyle.Bold, Color.white, new Vector2(26f, -535f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(140f, 34f), TextAnchor.MiddleLeft);
-            confidenceFill = CreateProgress(right.transform, new Vector2(26f, -586f), success);
-        }
-
-        private void CreateBottomPanel(Transform parent)
-        {
-            var bottom = CreatePanel(parent, "InfoPanel", Vector2.zero, new Vector2(1f, 0f), new Vector2(0f, 0f), new Vector2(28f, 28f), panel);
+            var bottom = Panel(parent, "InsightPanel", Vector2.zero, new Vector2(1f, 0f), new Vector2(0f, 0f), new Vector2(28f, 28f), panel);
             bottom.rectTransform.offsetMin = new Vector2(28f, 28f);
             bottom.rectTransform.offsetMax = new Vector2(-28f, 322f);
 
-            AddText(bottom.transform, "Seçili Bölge: Segment IV - Tümör Adayı", 34, FontStyle.Bold, Color.white, new Vector2(32f, -28f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(760f, 48f), TextAnchor.MiddleLeft);
-            AddText(bottom.transform, "MR kesitleri üzerinden işaretlenen alanlar eğitim amaçlı olarak renklendirildi. Sistem, doktor incelemesine yardımcı olacak ön rapor görünümünü hazırlıyor.", 25, FontStyle.Normal, new Color(0.78f, 0.86f, 0.9f), new Vector2(32f, -90f), new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(-64f, 102f), TextAnchor.UpperLeft);
+            insightTitle = AddText(bottom.transform, "Karaciğer Sağlığı Bilgilendirmesi", 32, FontStyle.Bold, Color.white, new Vector2(30f, -22f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(760f, 44f), TextAnchor.MiddleLeft);
+            insightBody = AddText(bottom.transform,
+                "Bu demo panelinde taralı alanların rengi seçilen hastalık senaryosuna göre değişir. Kırmızı bölge tümör şüphesi gibi dikkat gerektiren bulguları, camgöbeği bölge kistik oluşumu, yeşil alanlar ise sağlıklı karaciğer dokusunu temsil eder. Görselleştirme teşhis yerine eğitim ve hekim incelemesine yardımcı ön bilgilendirme amacıyla kullanılır.",
+                24,
+                FontStyle.Normal,
+                textSoft,
+                new Vector2(30f, -80f),
+                new Vector2(0f, 1f),
+                new Vector2(1f, 1f),
+                new Vector2(-60f, 120f),
+                TextAnchor.UpperLeft);
 
-            AddPill(bottom.transform, "HCC olasılığı", "68%", danger, new Vector2(32f, 42f));
-            AddPill(bottom.transform, "Kist", "22%", accent, new Vector2(300f, 42f));
-            AddPill(bottom.transform, "Normal doku", "91%", success, new Vector2(510f, 42f));
+            AddSmallBadge(bottom.transform, "Tümör şüphesi", "Kırmızı", red, new Vector2(30f, 48f));
+            AddSmallBadge(bottom.transform, "Kistik alan", "Camgöbeği", cyan, new Vector2(260f, 48f));
+            AddSmallBadge(bottom.transform, "Sağlıklı doku", "Yeşil", green, new Vector2(492f, 48f));
+            AddSmallBadge(bottom.transform, "Ön rapor", "Sahte veri", amber, new Vector2(722f, 48f));
         }
 
-        private Image CreatePanel(Transform parent, string name, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 anchoredPosition, Color color)
+        private void CenterHints(Transform parent)
+        {
+            var title = AddText(parent, "3B KARACİĞER MODELİ", 22, FontStyle.Bold, new Color(1f, 1f, 1f, 0.78f), new Vector2(0f, 300f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(360f, 34f), TextAnchor.MiddleCenter);
+            title.raycastTarget = false;
+            var hint = AddText(parent, "Butonlarla katmanları değiştir, + / - ile yakınlaştır", 18, FontStyle.Normal, new Color(0.8f, 0.9f, 0.96f, 0.72f), new Vector2(0f, 262f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(520f, 30f), TextAnchor.MiddleCenter);
+            hint.raycastTarget = false;
+        }
+
+        private void SetInsight(string title, string body)
+        {
+            insightTitle.text = title;
+            insightBody.text = body + "\n\nRenkler demonstrasyon amaçlıdır; gerçek klinik değerlendirme için hekim incelemesi gerekir.";
+        }
+
+        private Image Panel(Transform parent, string name, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 position, Color color)
         {
             var obj = new GameObject(name);
             obj.transform.SetParent(parent, false);
+
             var rect = obj.AddComponent<RectTransform>();
             rect.anchorMin = anchorMin;
             rect.anchorMax = anchorMax;
             rect.pivot = pivot;
-            rect.anchoredPosition = anchoredPosition;
+            rect.anchoredPosition = position;
 
             var image = obj.AddComponent<Image>();
             image.color = color;
             return image;
         }
 
-        private Text AddText(Transform parent, string text, int size, FontStyle style, Color color, Vector2 anchoredPosition, Vector2 anchorMin, Vector2 anchorMax, Vector2 sizeDelta, TextAnchor alignment)
+        private Text AddText(Transform parent, string text, int size, FontStyle style, Color color, Vector2 position, Vector2 anchorMin, Vector2 anchorMax, Vector2 sizeDelta, TextAnchor alignment)
         {
-            var obj = new GameObject(text);
+            var obj = new GameObject("Text");
             obj.transform.SetParent(parent, false);
+
             var rect = obj.AddComponent<RectTransform>();
             rect.anchorMin = anchorMin;
             rect.anchorMax = anchorMax;
             rect.pivot = new Vector2(anchorMin.x, anchorMin.y);
-            rect.anchoredPosition = anchoredPosition;
+            rect.anchoredPosition = position;
             rect.sizeDelta = sizeDelta;
 
             var label = obj.AddComponent<Text>();
@@ -205,63 +233,92 @@ namespace PatientLive.UI
             return label;
         }
 
-        private void AddButton(Transform parent, string label, Color color, Vector2 position)
+        private void AddActionButton(Transform parent, string title, string subtitle, Color color, Vector2 position, UnityAction action)
         {
-            var image = CreatePanel(parent, label + " Button", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), position, panelSoft);
-            SetSize(image.rectTransform, 258f, 78f);
-            image.color = new Color(color.r, color.g, color.b, 0.24f);
-            image.gameObject.AddComponent<Button>();
-            AddText(image.transform, label, 24, FontStyle.Bold, Color.white, new Vector2(24f, -15f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(210f, 46f), TextAnchor.MiddleLeft);
+            var image = Panel(parent, title, Vector2.zero, Vector2.zero, Vector2.zero, position, panelAlt);
+            SetSize(image.rectTransform, 257f, 86f);
+            var stripe = Panel(image.transform, "Accent", new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(0f, 0f), Vector2.zero, color);
+            stripe.rectTransform.sizeDelta = new Vector2(6f, 0f);
+
+            var button = image.gameObject.AddComponent<Button>();
+            button.onClick.AddListener(action);
+            AddText(image.transform, title, 22, FontStyle.Bold, Color.white, new Vector2(18f, 49f), Vector2.zero, Vector2.zero, new Vector2(210f, 26f), TextAnchor.MiddleLeft);
+            AddText(image.transform, subtitle, 16, FontStyle.Normal, textSoft, new Vector2(18f, 20f), Vector2.zero, Vector2.zero, new Vector2(218f, 22f), TextAnchor.MiddleLeft);
         }
 
-        private void AddToggleRow(Transform parent, string label, Color color, Vector2 position)
+        private void AddSquareButton(Transform parent, string label, Color color, Vector2 position, UnityAction action)
         {
-            var dot = CreatePanel(parent, label + " Dot", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), position, color);
-            SetSize(dot.rectTransform, 28f, 28f);
-            AddText(parent, label, 22, FontStyle.Normal, Color.white, position + new Vector2(42f, 8f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(190f, 34f), TextAnchor.MiddleLeft);
+            var image = Panel(parent, label, Vector2.zero, Vector2.zero, Vector2.zero, position, new Color(color.r, color.g, color.b, 0.25f));
+            SetSize(image.rectTransform, 68f, 68f);
+            var button = image.gameObject.AddComponent<Button>();
+            button.onClick.AddListener(action);
+            AddText(image.transform, label, 30, FontStyle.Bold, color, new Vector2(0f, 0f), Vector2.zero, Vector2.one, Vector2.zero, TextAnchor.MiddleCenter);
         }
 
         private void AddMetric(Transform parent, string label, string value, Color color, Vector2 position)
         {
-            var metric = CreatePanel(parent, label + " Metric", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), position, panelSoft);
-            SetSize(metric.rectTransform, 278f, 76f);
-            AddText(metric.transform, label, 20, FontStyle.Normal, new Color(0.72f, 0.81f, 0.87f), new Vector2(18f, -10f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(150f, 30f), TextAnchor.MiddleLeft);
-            AddText(metric.transform, value, 26, FontStyle.Bold, color, new Vector2(180f, -18f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(80f, 40f), TextAnchor.MiddleRight);
+            var metric = Panel(parent, label, Vector2.zero, Vector2.zero, Vector2.zero, position, panelAlt);
+            SetSize(metric.rectTransform, 277f, 76f);
+            AddText(metric.transform, label, 18, FontStyle.Normal, textSoft, new Vector2(18f, 46f), Vector2.zero, Vector2.zero, new Vector2(150f, 24f), TextAnchor.MiddleLeft);
+            AddText(metric.transform, value, 25, FontStyle.Bold, color, new Vector2(154f, 22f), Vector2.zero, Vector2.zero, new Vector2(104f, 34f), TextAnchor.MiddleRight);
         }
 
-        private Image CreateProgress(Transform parent, Vector2 position, Color fillColor)
+        private Image AddProgress(Transform parent, Vector2 position, Color color)
         {
-            var track = CreatePanel(parent, "ProgressTrack", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), position, new Color(1f, 1f, 1f, 0.12f));
-            SetSize(track.rectTransform, 210f, 20f);
+            var track = Panel(parent, "Track", Vector2.zero, Vector2.zero, Vector2.zero, position, line);
+            SetSize(track.rectTransform, 210f, 18f);
 
-            var fill = CreatePanel(track.transform, "ProgressFill", Vector2.zero, Vector2.one, new Vector2(0f, 0.5f), Vector2.zero, fillColor);
-            fill.type = Image.Type.Filled;
-            fill.fillMethod = Image.FillMethod.Horizontal;
-            fill.fillOrigin = 0;
-            fill.fillAmount = 0.1f;
+            var fill = Panel(track.transform, "Fill", Vector2.zero, Vector2.one, new Vector2(0f, 0.5f), Vector2.zero, color);
             fill.rectTransform.offsetMin = Vector2.zero;
             fill.rectTransform.offsetMax = Vector2.zero;
+            fill.type = Image.Type.Filled;
+            fill.fillMethod = Image.FillMethod.Horizontal;
+            fill.fillAmount = 0.5f;
             return fill;
         }
 
-        private void AddPill(Transform parent, string label, string value, Color color, Vector2 position)
+        private void AddChip(Transform parent, string label, Color color, Vector2 position, float width)
         {
-            var pill = CreatePanel(parent, label + " Pill", new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f), position, new Color(color.r, color.g, color.b, 0.22f));
-            SetSize(pill.rectTransform, 230f, 72f);
-            AddText(pill.transform, label, 18, FontStyle.Normal, new Color(0.8f, 0.88f, 0.92f), new Vector2(18f, 46f), Vector2.zero, Vector2.zero, new Vector2(150f, 24f), TextAnchor.MiddleLeft);
-            AddText(pill.transform, value, 28, FontStyle.Bold, color, new Vector2(150f, 36f), Vector2.zero, Vector2.zero, new Vector2(58f, 32f), TextAnchor.MiddleRight);
+            var chip = Panel(parent, label, Vector2.one, Vector2.one, Vector2.one, position, new Color(color.r, color.g, color.b, 0.2f));
+            SetSize(chip.rectTransform, width, 42f);
+            AddText(chip.transform, label, 18, FontStyle.Bold, color, Vector2.zero, Vector2.zero, Vector2.one, Vector2.zero, TextAnchor.MiddleCenter);
         }
 
-        private void CreateChip(Transform parent, string label, Color color, Vector2 position)
+        private void AddSmallBadge(Transform parent, string label, string value, Color color, Vector2 position)
         {
-            var chip = CreatePanel(parent, label + " Chip", Vector2.one, Vector2.one, Vector2.one, position, new Color(color.r, color.g, color.b, 0.24f));
-            SetSize(chip.rectTransform, 108f, 42f);
-            AddText(chip.transform, label, 18, FontStyle.Bold, color, new Vector2(0f, 0f), Vector2.zero, Vector2.one, Vector2.zero, TextAnchor.MiddleCenter);
+            var badge = Panel(parent, label, Vector2.zero, Vector2.zero, Vector2.zero, position, new Color(color.r, color.g, color.b, 0.16f));
+            SetSize(badge.rectTransform, 204f, 62f);
+            AddText(badge.transform, label, 15, FontStyle.Normal, textSoft, new Vector2(14f, 36f), Vector2.zero, Vector2.zero, new Vector2(150f, 20f), TextAnchor.MiddleLeft);
+            AddText(badge.transform, value, 20, FontStyle.Bold, color, new Vector2(14f, 12f), Vector2.zero, Vector2.zero, new Vector2(170f, 24f), TextAnchor.MiddleLeft);
         }
 
         private static void SetSize(RectTransform rect, float width, float height)
         {
             rect.sizeDelta = new Vector2(width, height);
+        }
+
+        private static void EnsureEventSystem()
+        {
+            if (EventSystem.current != null)
+            {
+                return;
+            }
+
+            var eventSystem = new GameObject("EventSystem");
+            eventSystem.AddComponent<EventSystem>();
+            eventSystem.AddComponent<StandaloneInputModule>();
+        }
+
+        private static void EnsureShowcase()
+        {
+            if (DemoLiverShowcase.Instance != null || FindFirstObjectByType<DemoLiverShowcase>() != null)
+            {
+                return;
+            }
+
+            var host = new GameObject("DemoLiverShowcase");
+            DontDestroyOnLoad(host);
+            host.AddComponent<DemoLiverShowcase>();
         }
     }
 }
