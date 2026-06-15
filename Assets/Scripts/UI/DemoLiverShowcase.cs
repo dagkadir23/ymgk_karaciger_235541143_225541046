@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 namespace PatientLive.UI
 {
@@ -16,6 +17,7 @@ namespace PatientLive.UI
         private readonly Color cystColor = new Color(0.22f, 0.86f, 0.95f, 1f);
 
         private Transform modelRoot;
+        private Transform assetModel;
         private Transform lesionRegion;
         private Transform cystRegion;
         private Transform healthyRegion;
@@ -26,6 +28,9 @@ namespace PatientLive.UI
         private bool lesionMode = true;
         private bool vesselMode = true;
         private bool reportMode;
+        private bool isDragging;
+        private Vector2 lastPointerPosition;
+        private float manualInputTimer;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Bootstrap()
@@ -59,8 +64,14 @@ namespace PatientLive.UI
                 return;
             }
 
-            modelRoot.Rotate(Vector3.up, 12f * Time.deltaTime, Space.World);
-            modelRoot.Rotate(Vector3.forward, Mathf.Sin(Time.time * 0.8f) * 2f * Time.deltaTime, Space.Self);
+            HandleModelInput();
+
+            manualInputTimer = Mathf.Max(0f, manualInputTimer - Time.deltaTime);
+            if (manualInputTimer <= 0f)
+            {
+                modelRoot.Rotate(Vector3.up, 12f * Time.deltaTime, Space.World);
+                modelRoot.Rotate(Vector3.forward, Mathf.Sin(Time.time * 0.8f) * 2f * Time.deltaTime, Space.Self);
+            }
 
             currentZoom = Mathf.Lerp(currentZoom, targetZoom, Time.deltaTime * 5f);
             modelRoot.localScale = Vector3.one * currentZoom;
@@ -81,6 +92,13 @@ namespace PatientLive.UI
             targetZoom = 1f;
             currentZoom = 1f;
             modelRoot.rotation = Quaternion.Euler(-8f, -20f, 8f);
+        }
+
+        public void RotateByDrag(Vector2 delta)
+        {
+            manualInputTimer = 1.4f;
+            modelRoot.Rotate(Vector3.up, -delta.x * 0.22f, Space.World);
+            modelRoot.Rotate(Vector3.right, delta.y * 0.16f, Space.World);
         }
 
         public string ToggleLesionLayer()
@@ -134,9 +152,12 @@ namespace PatientLive.UI
             modelRoot.position = new Vector3(0f, 0.05f, 0f);
             modelRoot.rotation = Quaternion.Euler(-8f, -20f, 8f);
 
-            CreateLiverMass("RightLobe", new Vector3(0.35f, 0f, 0f), new Vector3(2.4f, 1.35f, 1.15f), liverColor);
-            CreateLiverMass("LeftLobe", new Vector3(-1.15f, -0.02f, 0.02f), new Vector3(1.45f, 0.95f, 0.9f), new Color(0.55f, 0.12f, 0.15f, 1f));
-            CreateLiverMass("LowerCurve", new Vector3(-0.1f, -0.48f, 0.02f), new Vector3(2.1f, 0.55f, 0.85f), new Color(0.5f, 0.1f, 0.13f, 1f));
+            if (!TryCreateAssetModel())
+            {
+                CreateLiverMass("RightLobe", new Vector3(0.35f, 0f, 0f), new Vector3(2.4f, 1.35f, 1.15f), liverColor);
+                CreateLiverMass("LeftLobe", new Vector3(-1.15f, -0.02f, 0.02f), new Vector3(1.45f, 0.95f, 0.9f), new Color(0.55f, 0.12f, 0.15f, 1f));
+                CreateLiverMass("LowerCurve", new Vector3(-0.1f, -0.48f, 0.02f), new Vector3(2.1f, 0.55f, 0.85f), new Color(0.5f, 0.1f, 0.13f, 1f));
+            }
 
             healthyRegion = CreateRegion("HealthyRegion", new Vector3(0.92f, 0.28f, -0.63f), 0.26f, healthyColor);
             lesionRegion = CreateRegion("TumorScanRegion", new Vector3(-0.42f, 0.12f, -0.66f), 0.36f, lesionColor);
@@ -149,6 +170,110 @@ namespace PatientLive.UI
             CreateVessel(new Vector3(0.2f, 0.13f, -0.78f), new Vector3(0.95f, 0.45f, -0.78f), 0.028f);
         }
 
+        private bool TryCreateAssetModel()
+        {
+            GameObject liverPrefab = Resources.Load<GameObject>("DemoLiverModel");
+            if (liverPrefab == null)
+            {
+                liverPrefab = Resources.Load<GameObject>("liver_model");
+            }
+
+            if (liverPrefab == null)
+            {
+                return false;
+            }
+
+            GameObject liver = Instantiate(liverPrefab, modelRoot);
+            liver.name = "ProjectAsset_LiverModel";
+            assetModel = liver.transform;
+
+            Bounds bounds = CalculateBounds(liver);
+            Vector3 center = bounds.center;
+            float maxSize = Mathf.Max(bounds.size.x, Mathf.Max(bounds.size.y, bounds.size.z));
+            float scale = maxSize > 0.001f ? 2.75f / maxSize : 1f;
+
+            assetModel.localPosition = -center * scale;
+            assetModel.localRotation = Quaternion.Euler(0f, 180f, 0f);
+            assetModel.localScale = Vector3.one * scale;
+            ApplyResourceMaterial(liver);
+            return true;
+        }
+
+        private void HandleModelInput()
+        {
+            if (Input.touchCount > 0)
+            {
+                HandleTouchInput();
+                return;
+            }
+
+            if (Input.GetMouseButtonDown(0) && !IsPointerOverUi())
+            {
+                isDragging = true;
+                lastPointerPosition = Input.mousePosition;
+                manualInputTimer = 1.4f;
+            }
+
+            if (Input.GetMouseButton(0) && isDragging)
+            {
+                Vector2 current = Input.mousePosition;
+                RotateByDrag(current - lastPointerPosition);
+                lastPointerPosition = current;
+            }
+
+            if (Input.GetMouseButtonUp(0))
+            {
+                isDragging = false;
+            }
+        }
+
+        private void HandleTouchInput()
+        {
+            if (Input.touchCount == 1)
+            {
+                Touch touch = Input.GetTouch(0);
+                if (touch.phase == TouchPhase.Began && IsPointerOverUi(touch.fingerId))
+                {
+                    isDragging = false;
+                    return;
+                }
+
+                if (touch.phase == TouchPhase.Moved)
+                {
+                    RotateByDrag(touch.deltaPosition);
+                }
+
+                if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled)
+                {
+                    isDragging = false;
+                }
+            }
+
+            if (Input.touchCount == 2)
+            {
+                Touch first = Input.GetTouch(0);
+                Touch second = Input.GetTouch(1);
+                Vector2 firstPrevious = first.position - first.deltaPosition;
+                Vector2 secondPrevious = second.position - second.deltaPosition;
+                float previousDistance = Vector2.Distance(firstPrevious, secondPrevious);
+                float currentDistance = Vector2.Distance(first.position, second.position);
+                targetZoom = Mathf.Clamp(targetZoom + (currentDistance - previousDistance) * 0.0018f, 0.75f, 1.75f);
+                manualInputTimer = 1.4f;
+            }
+        }
+
+        private static bool IsPointerOverUi(int fingerId = -1)
+        {
+            if (EventSystem.current == null)
+            {
+                return false;
+            }
+
+            return fingerId >= 0
+                ? EventSystem.current.IsPointerOverGameObject(fingerId)
+                : EventSystem.current.IsPointerOverGameObject();
+        }
+
         private void CreateCamera()
         {
             if (Camera.main != null)
@@ -159,28 +284,38 @@ namespace PatientLive.UI
             var cameraObject = new GameObject("DemoShowcaseCamera");
             showcaseCamera = cameraObject.AddComponent<Camera>();
             showcaseCamera.clearFlags = CameraClearFlags.SolidColor;
-            showcaseCamera.backgroundColor = new Color(0.025f, 0.035f, 0.05f, 1f);
-            showcaseCamera.fieldOfView = 38f;
+            showcaseCamera.backgroundColor = new Color(0.05f, 0.07f, 0.1f, 1f);
+            showcaseCamera.fieldOfView = 42f;
             cameraObject.tag = "MainCamera";
-            cameraObject.transform.position = new Vector3(0f, 0.15f, -7f);
+            cameraObject.transform.position = new Vector3(0f, 0.15f, -6.5f);
             cameraObject.transform.LookAt(Vector3.zero);
         }
 
         private void CreateLights()
         {
-            var key = new GameObject("DemoKeyLight");
+            var key = new GameObject("KeyLight");
             var keyLight = key.AddComponent<Light>();
             keyLight.type = LightType.Directional;
-            keyLight.intensity = 1.35f;
-            key.transform.rotation = Quaternion.Euler(38f, -35f, 0f);
+            keyLight.intensity = 1.6f;
+            keyLight.color = new Color(1f, 0.98f, 0.95f);
+            key.transform.rotation = Quaternion.Euler(45f, -30f, 0f);
 
-            var rim = new GameObject("DemoRimLight");
+            var fill = new GameObject("FillLight");
+            var fillLight = fill.AddComponent<Light>();
+            fillLight.type = LightType.Directional;
+            fillLight.intensity = 0.6f;
+            fillLight.color = new Color(0.6f, 0.75f, 1f);
+            fill.transform.rotation = Quaternion.Euler(15f, 60f, 0f);
+
+            var rim = new GameObject("RimLight");
             var rimLight = rim.AddComponent<Light>();
-            rimLight.type = LightType.Point;
-            rimLight.color = new Color(0.25f, 0.68f, 1f, 1f);
-            rimLight.intensity = 2.1f;
-            rimLight.range = 8f;
-            rim.transform.position = new Vector3(2.8f, 1.8f, -2.8f);
+            rimLight.type = LightType.Directional;
+            rimLight.intensity = 1.8f;
+            rimLight.color = new Color(0.1f, 0.85f, 0.95f);
+            rim.transform.rotation = Quaternion.Euler(30f, 150f, 0f);
+
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
+            RenderSettings.ambientLight = new Color(0.08f, 0.12f, 0.18f);
         }
 
         private void CreateLiverMass(string name, Vector3 localPosition, Vector3 localScale, Color color)
@@ -191,6 +326,23 @@ namespace PatientLive.UI
             part.transform.localPosition = localPosition;
             part.transform.localScale = localScale;
             ApplyMaterial(part, color, 0.18f, 0.55f);
+        }
+
+        private static Bounds CalculateBounds(GameObject root)
+        {
+            Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
+            if (renderers.Length == 0)
+            {
+                return new Bounds(Vector3.zero, Vector3.one);
+            }
+
+            Bounds bounds = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++)
+            {
+                bounds.Encapsulate(renderers[i].bounds);
+            }
+
+            return bounds;
         }
 
         private Transform CreateRegion(string name, Vector3 localPosition, float radius, Color color)
@@ -227,6 +379,37 @@ namespace PatientLive.UI
             material.EnableKeyword("_EMISSION");
             material.SetColor("_EmissionColor", color * 0.05f);
             obj.GetComponent<Renderer>().material = material;
+        }
+
+        private static void ApplyResourceMaterial(GameObject root)
+        {
+            Texture2D albedo = Resources.Load<Texture2D>("liver_albedo");
+            Texture2D normal = Resources.Load<Texture2D>("liver_normal");
+            Texture2D roughness = Resources.Load<Texture2D>("liver_roughness");
+            Material material = new Material(Shader.Find("Standard"));
+            material.color = new Color(1.0f, 0.95f, 0.95f); // Slight warm organic tint
+            material.mainTexture = albedo;
+            material.SetFloat("_Metallic", 0.02f); // Low metallic for organic tissue
+            material.SetFloat("_Glossiness", 0.75f); // Higher glossiness for "wet" liver look
+
+            if (normal != null)
+            {
+                material.SetTexture("_BumpMap", normal);
+                material.EnableKeyword("_NORMALMAP");
+            }
+
+            if (roughness != null)
+            {
+                // In Unity Standard, Glossiness is derived from texture alpha. 
+                // Using a roughness map directly as metallic gloss map may yield incorrect results 
+                // if it's greyscale. So we rely on the _Glossiness scalar mostly.
+                material.SetTexture("_MetallicGlossMap", roughness);
+            }
+
+            foreach (Renderer renderer in root.GetComponentsInChildren<Renderer>(true))
+            {
+                renderer.material = material;
+            }
         }
 
         private static void SetRegionScale(Transform region, float scale)

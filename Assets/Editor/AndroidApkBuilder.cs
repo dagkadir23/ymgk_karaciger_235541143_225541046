@@ -11,8 +11,11 @@ namespace PatientLive.Editor
         private const string ScenePath = "Assets/Scenes/PatientLive_MVP.unity";
         private const string OutputPath = "Builds/PatientLive_Demo.apk";
 
+        [MenuItem("PatientLive/Build APK")]
         public static void BuildApk()
         {
+            DemoLiverAssetBuilder.EnsureDemoLiverResource();
+
             Directory.CreateDirectory(Path.GetDirectoryName(OutputPath));
 
             EditorUserBuildSettings.buildAppBundle = false;
